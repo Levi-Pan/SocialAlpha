@@ -1,0 +1,31 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+local_config*
+
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Runtime data, logs, and temporary files
+data/
+logs/
+*.log
+*.tmp
+*.bak
+
+# Local editor and agent settings
+.idea/
+.vscode/
+.codex/
+.agents/
+Thumbs.db
+.DS_Store
