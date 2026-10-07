@@ -1,0 +1,7 @@
+{
+  "token_url": "https://www.reddit.com/api/v1/access_token",
+  "api_base_url": "https://oauth.reddit.com",
+  "subreddit": "Bitcoin",
+  "limit": 20,
+  "timeout": 15
+}

@@ -1,0 +1,19 @@
+{
+  "feeds": [
+    {"source": "coindesk", "url": "https://www.coindesk.com/arc/outboundfeeds/rss/"},
+    {"source": "cointelegraph", "url": "https://cointelegraph.com/rss"}
+  ],
+  "user_agent": "SocialAlpha/0.1 RSS reader",
+  "timeout": 20,
+  "limit_per_source": 30,
+  "max_feed_bytes": 5000000,
+  "output_parts": ["data", "news_clean.json"],
+  "symbol_aliases": {
+    "BTC": ["BTC", "Bitcoin"],
+    "ETH": ["ETH", "Ethereum", "Ether"],
+    "SOL": ["SOL", "Solana"],
+    "XRP": ["XRP", "Ripple"],
+    "DOGE": ["DOGE", "Dogecoin"],
+    "BNB": ["BNB", "Binance Coin", "BNB Chain"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "base_url": "https://data-api.binance.vision",
+  "klines_path": "/api/v3/klines",
+  "time_path": "/api/v3/time",
+  "quote_asset": "USDT",
+  "interval": "1d",
+  "history_days": 90,
+  "timeout": 20,
+  "user_agent": "SocialAlpha/0.1 public market reader"
+}

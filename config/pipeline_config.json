@@ -1,0 +1,34 @@
+{
+  "symbols": ["BTC", "ETH", "SOL", "XRP", "DOGE", "BNB"],
+  "analysis_parts": ["data", "news_analysis.json"],
+  "report_json_parts": ["data", "daily_report.json"],
+  "report_markdown_parts": ["data", "daily_report.md"],
+  "signals_parts": ["data", "signals_latest.json"],
+  "signal_history_parts": ["data", "signals_history.json"],
+  "market_parts": ["data", "market_daily.json"],
+  "market_report": {
+    "max_age_hours": 36,
+    "expected_interval_hours": 24
+  },
+  "backtest_parts": ["data", "backtest_result.json"],
+  "report": {
+    "focus_entities": ["Strategy", "CZ"],
+    "default_news_weight": 1.0,
+    "entity_weights": {"Strategy": 1.25, "CZ": 1.25},
+    "lookback_hours": 24,
+    "sentiment_values": {"positive": 1, "negative": -1, "neutral": 0, "mixed": 0, "unknown": 0},
+    "minimum_articles": 2,
+    "confidence_floor": 0.5,
+    "max_evidence": 5
+  },
+  "signals": {
+    "positive_threshold": 0.25,
+    "negative_threshold": -0.25,
+    "max_symbol_weight": 0.16666666666666666,
+    "max_total_weight": 1.0
+  },
+  "backtest": {
+    "fee_bps": 10,
+    "slippage_bps": 5
+  }
+}
