@@ -1,0 +1,30 @@
+{
+  "symbol_aliases": {
+    "BTC": [
+      "BTC",
+      "Bitcoin"
+    ],
+    "ETH": [
+      "ETH",
+      "Ethereum",
+      "Ether"
+    ],
+    "SOL": [
+      "SOL",
+      "Solana"
+    ],
+    "XRP": [
+      "XRP",
+      "Ripple"
+    ],
+    "DOGE": [
+      "DOGE",
+      "Dogecoin"
+    ],
+    "BNB": [
+      "BNB",
+      "Binance Coin",
+      "BNB Chain"
+    ]
+  }
+}

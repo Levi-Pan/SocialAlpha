@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "user_agent": "SocialAlpha/0.2 public feed reader",
+  "timeout": 20,
+  "max_response_bytes": 5000000,
+  "limit_per_source": 30,
+  "status_parts": ["data", "social_source_status.json"],
+  "feeds": [
+    {"source": "reddit_ethereum", "platform": "reddit", "content_kind": "community", "url": "https://www.reddit.com/r/ethereum/new/.rss"},
+    {"source": "reddit_ethtrader", "platform": "reddit", "content_kind": "community", "url": "https://www.reddit.com/r/ethtrader/new/.rss"},
+    {"source": "reddit_solana", "platform": "reddit", "content_kind": "community", "url": "https://www.reddit.com/r/solana/new/.rss"},
+    {"source": "reddit_xrp", "platform": "reddit", "content_kind": "community", "url": "https://www.reddit.com/r/XRP/new/.rss"},
+    {"source": "reddit_dogecoin", "platform": "reddit", "content_kind": "community", "url": "https://www.reddit.com/r/dogecoin/new/.rss"}
+  ],
+  "telegram_channels": [
+    {"source": "telegram_bnbchain", "channel": "bnbchain", "platform": "telegram", "content_kind": "official", "url": "https://t.me/s/bnbchain"}
+  ],
+  "x": {
+    "enabled": false,
+    "bearer_token_env": "X_BEARER_TOKEN",
+    "api_base_url": "https://api.x.com/2",
+    "post_base_url": "https://x.com",
+    "max_results": 20,
+    "accounts": ["ethereum", "ethereumfndn", "solana", "XRPLF", "dogecoin", "BNBCHAIN"]
+  }
+}

@@ -9,19 +9,19 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from dotenv import load_dotenv
 from openai import APIError, OpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
+from private_module.project_config import load_analysis_config
+from private_module.project_io import project_path, read_json, write_json_atomic
 from processor.news_focus import classify_news_focus
+from reporting.daily_report import build_daily_report
 
 
-PROJECT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger = logging.getLogger(__name__)
 
 
@@ -38,21 +38,6 @@ class NewsAnalysis(BaseModel):
     insufficient_context: bool
 
 
-def load_analysis_config():
-    """
-    加载分析参数及环境配置，不修改已有环境变量。
-
-    :return: 分析配置字典
-    """
-    load_dotenv(os.path.join(PROJECT_PATH, ".env"), override=False)
-    with open(os.path.join(PROJECT_PATH, "config", "analysis_config.json"), encoding="utf-8") as config_file:
-        config = json.load(config_file)
-    config["model"] = os.getenv("OPENAI_MODEL", "").strip()
-    config["api_key"] = os.getenv("OPENAI_API_KEY", "").strip()
-    config["base_url"] = os.getenv("OPENAI_BASE_URL", "").strip() or None
-    return config
-
-
 def prepare_analysis_input(record, config):
     """
     只取新闻标题摘要及来源，不发送作者信息。
@@ -61,12 +46,16 @@ def prepare_analysis_input(record, config):
     :param config: 分析配置
     :return: 发给模型的新闻字典
     """
-    return {
+    payload = {
         "title": record["title"],
         "content": record["content"][:config["max_content_chars"]],
         "source": record["source"],
         "publish_time": record["publish_time"],
     }
+    if record.get("content_kind") in ("community", "official"):
+        payload["content_kind"] = record["content_kind"]
+        payload["source_context"] = "社区观点，不能视为已核实新闻" if record["content_kind"] == "community" else "官方账号原帖，按实际正文判断相关币种"
+    return payload
 
 
 def analysis_fingerprint(record, config):
@@ -97,17 +86,42 @@ def save_analysis_results(output_path, results):
     :param results: 分析状态列表或用量账本字典
     :return: 无
     """
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    temporary_path = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=os.path.dirname(output_path),
-                                         suffix=".tmp", delete=False) as output_file:
-            temporary_path = output_file.name
-            json.dump(results, output_file, ensure_ascii=False, indent=2)
-        os.replace(temporary_path, output_path)
-    finally:
-        if temporary_path and os.path.exists(temporary_path):
-            os.remove(temporary_path)
+    write_json_atomic(output_path, results)
+
+
+def order_pending_by_coverage(pending, results, config, now):
+    """
+    优先处理日报窗口内覆盖不足的币种，选择后增加预计覆盖避免单币占满额度。
+
+    :param pending: 待分析的原始记录与结果记录元组列表
+    :param results: 当前已缓存成功结果
+    :param config: 含 selection 参数的分析配置
+    :param now: 当前有时区的观察时间
+    :return: 按覆盖均衡排序的候选列表
+    """
+    selection = config.get("selection")
+    if not selection:
+        return pending
+    report_config = dict(selection, symbols=list(config["focus"]["symbol_aliases"]), minimum_articles=1,
+                         max_evidence=0, sentiment_values={"positive": 1, "negative": -1, "neutral": 0, "mixed": 0})
+    report = build_daily_report(results, report_config, now)
+    counts = {coin["symbol"]: coin["usable_count"] for coin in report["coins"]}
+    for coin in report["social_coins"]:
+        counts[coin["symbol"]] += coin["usable_count"]
+    remaining = list(pending)
+    ordered = []
+    window_start = now - timedelta(hours=selection["lookback_hours"])
+    while remaining:
+        candidate = min(remaining, key=lambda item: (
+            datetime.fromisoformat(item[0]["publish_time"]) < window_start,
+            min((counts[symbol] for symbol in item[1]["focus"]["symbols"]), default=float("inf")),
+            item[0].get("content_kind") == "community",
+            -datetime.fromisoformat(item[0]["publish_time"]).timestamp()))
+        remaining.remove(candidate)
+        ordered.append(candidate)
+        for symbol in candidate[1]["focus"]["symbols"]:
+            counts[symbol] += 1
+    return ordered
 
 
 def analyze_news_record(client, record, config, usage=None):
@@ -145,7 +159,7 @@ def analysis_run_lock(config):
     :param config: 分析配置
     :return: 锁持有期间的上下文
     """
-    lock_path = os.path.join(PROJECT_PATH, *config["lock_parts"])
+    lock_path = project_path(config["lock_parts"])
     os.makedirs(os.path.dirname(lock_path), exist_ok=True)
     try:
         lock_file = open(lock_path, "x", encoding="utf-8")
@@ -167,10 +181,9 @@ def load_usage_ledger(config, cached_results):
     :param cached_results: 原有分析记录
     :return: 用量账本字典
     """
-    usage_path = os.path.join(PROJECT_PATH, *config["usage_parts"])
+    usage_path = project_path(config["usage_parts"])
     if os.path.exists(usage_path):
-        with open(usage_path, encoding="utf-8") as usage_file:
-            ledger = json.load(usage_file)
+        ledger = read_json(usage_path)
         if not isinstance(ledger, dict):
             raise ValueError("用量账本格式错误，停止调用")
         return ledger
@@ -222,10 +235,9 @@ def execute_analysis_pipeline(config, limit=None, dry_run=False):
     limit = config["max_articles"] if limit is None else limit
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
         raise ValueError("分析条数必须是正整数")
-    input_path = os.path.join(PROJECT_PATH, *config["input_parts"])
-    output_path = os.path.join(PROJECT_PATH, *config["output_parts"])
-    with open(input_path, encoding="utf-8") as input_file:
-        records = json.load(input_file)
+    input_path = project_path(config["input_parts"])
+    output_path = project_path(config["output_parts"])
+    records = read_json(input_path)
     if not isinstance(records, list) or not records:
         raise ValueError("新闻输入为空或不是列表，请先运行新闻采集")
     now = datetime.now(timezone.utc)
@@ -234,16 +246,14 @@ def execute_analysis_pipeline(config, limit=None, dry_run=False):
                                     -datetime.fromisoformat(record["publish_time"]).timestamp()))
     cached_results = []
     if os.path.exists(output_path):
-        with open(output_path, encoding="utf-8") as cached_file:
-            cached_results = json.load(cached_file)
+        cached_results = read_json(output_path)
         if not isinstance(cached_results, list):
             raise ValueError("分析缓存格式错误，请检查输出文件")
     cached_by_key = {}
-    cache_path = os.path.join(PROJECT_PATH, *config["cache_parts"])
+    cache_path = project_path(config["cache_parts"])
     archive = []
     if os.path.exists(cache_path):
-        with open(cache_path, encoding="utf-8") as cache_file:
-            archive = json.load(cache_file)
+        archive = read_json(cache_path)
         if not isinstance(archive, list):
             raise ValueError("历史缓存格式错误，停止调用")
     for result in archive + cached_results:
@@ -251,7 +261,7 @@ def execute_analysis_pipeline(config, limit=None, dry_run=False):
             NewsAnalysis.model_validate(result["analysis"])
             cached_by_key[(result["id"], result["fingerprint"])] = result
     ledger = load_usage_ledger(config, cached_results)
-    usage_path = os.path.join(PROJECT_PATH, *config["usage_parts"])
+    usage_path = project_path(config["usage_parts"])
     day = now.astimezone(timezone(timedelta(hours=8))).date().isoformat()
     today_usage = ledger.setdefault(day, empty_usage_stats())
     daily_cap = config["daily_max_requests"]
@@ -270,12 +280,15 @@ def execute_analysis_pipeline(config, limit=None, dry_run=False):
         else:
             results.append({"id": record["id"], "title": record["title"], "url": record["url"],
                             "source": record["source"], "publish_time": record["publish_time"],
+                            "platform": record.get("platform", "news"),
+                            "content_kind": record.get("content_kind", "media"),
                             "fetched_at": record["fetched_at"], "fingerprint": fingerprint,
                             "model": config["model"], "prompt_version": config["prompt_version"],
                             "status": "pending" if focus["selected"] else "filtered", "focus": focus,
                             "analysis": None, "analyzed_at": None, "error": None, "usage": None})
             if focus["selected"]:
                 pending.append((record, results[-1]))
+    pending = order_pending_by_coverage(pending, results, config, now)
     filtered_count = sum(result["status"] == "filtered" for result in results)
     logger.info("新闻 %s 条；规则过滤 %s 条；复用 %s 条；待分析 %s 条；本次可请求 %s 条",
                 len(records), filtered_count, sum(result["status"] == "success" for result in results),

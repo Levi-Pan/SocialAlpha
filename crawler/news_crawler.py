@@ -28,8 +28,29 @@ def parse_news_feed(feed_content, source, fetched_at, limit):
     if b"<!DOCTYPE" in feed_content.upper() or b"<!ENTITY" in feed_content.upper():
         raise ValueError("RSS 含不支持的 DTD 或实体声明")
     root = ET.fromstring(feed_content)
+    if root.tag == "{http://www.w3.org/2005/Atom}feed":
+        namespace = {"atom": "http://www.w3.org/2005/Atom"}
+        records = []
+        for entry in root.findall("atom:entry", namespace)[:limit]:
+            links = entry.findall("atom:link", namespace)
+            content = entry.find("atom:content", namespace)
+            if content is None:
+                content = entry.find("atom:summary", namespace)
+            records.append({
+                "platform": "news", "source": source,
+                "author": entry.findtext("atom:author/atom:name", namespaces=namespace),
+                "title": entry.findtext("atom:title", "", namespace),
+                "content": "" if content is None else "".join(content.itertext()),
+                "publish_time": entry.findtext("atom:published", namespaces=namespace)
+                                or entry.findtext("atom:updated", namespaces=namespace),
+                "fetched_at": fetched_at,
+                "url": next((link.get("href", "") for link in links
+                             if link.get("rel", "alternate") == "alternate"), ""),
+                "score": None, "comments": None,
+            })
+        return records
     if root.tag != "rss" or root.find("channel") is None:
-        raise ValueError("新闻源不是支持的 RSS 2.0 格式")
+        raise ValueError("新闻源不是支持的 RSS 2.0 或 Atom 格式")
     records = []
     for item in root.findall("./channel/item")[:limit]:
         records.append({

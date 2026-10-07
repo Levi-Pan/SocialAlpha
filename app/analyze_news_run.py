@@ -16,12 +16,11 @@ if PROJECT_PATH not in sys.path:
     sys.path.insert(0, PROJECT_PATH)
 
 from processor.news_analyzer import run_analysis_pipeline
+from private_module.private_log import configure_logging
 
 
 if __name__ == "__main__":
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8")
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    configure_logging()
     parser = argparse.ArgumentParser(description="新闻情绪与事件分析")
     parser.add_argument("--limit", type=int, default=None, help="本次最多调用模型的新闻数量")
     parser.add_argument("--dry-run", action="store_true", help="离线检查，不调用模型、不写结果")

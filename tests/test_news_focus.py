@@ -5,12 +5,11 @@
 # software:Vscode
 # brief :验证普通币种新闻不再被重大事件门槛过滤
 
-import json
-import os
 import unittest
 from datetime import datetime, timedelta, timezone
 
 from processor.news_focus import classify_news_focus
+from private_module.project_config import load_project_config
 
 
 class NewsFocusTests(unittest.TestCase):
@@ -22,9 +21,7 @@ class NewsFocusTests(unittest.TestCase):
 
         :return: 无
         """
-        project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        with open(os.path.join(project_path, "config", "analysis_config.json"), encoding="utf-8") as config_file:
-            self.config = json.load(config_file)
+        self.config = load_project_config("analysis")
         self.now = datetime(2026, 10, 6, 12, tzinfo=timezone.utc)
 
     def classify(self, title, age=0):

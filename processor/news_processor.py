@@ -9,7 +9,7 @@ import hashlib
 import html
 import logging
 import re
-from datetime import timezone
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -113,7 +113,10 @@ def clean_news_posts(records, symbol_aliases):
             url = normalize_url(record.get("url"))
             if url in seen_urls:
                 continue
-            published = parsedate_to_datetime(record.get("publish_time") or "")
+            try:
+                published = datetime.fromisoformat((record.get("publish_time") or "").replace("Z", "+00:00"))
+            except ValueError:
+                published = parsedate_to_datetime(record.get("publish_time") or "")
             if published.tzinfo is None:
                 raise ValueError("发布时间没有时区")
             content = clean_text(record.get("content"))
@@ -122,15 +125,16 @@ def clean_news_posts(records, symbol_aliases):
                                                title + " " + content, re.IGNORECASE) for alias in aliases)]
             cleaned.append({
                 "id": hashlib.sha256(url.encode("utf-8")).hexdigest(),
-                "platform": "news",
+                "platform": record.get("platform", "news"),
+                "content_kind": record.get("content_kind", "media"),
                 "source": record["source"],
                 "author": clean_text(record.get("author")) or None,
                 "title": title,
                 "content": content,
                 "publish_time": published.astimezone(timezone.utc).isoformat(),
                 "fetched_at": record["fetched_at"],
-                "score": None,
-                "comments": None,
+                "score": record.get("score"),
+                "comments": record.get("comments"),
                 "url": url,
                 "mention_symbol": mention_symbol,
             })

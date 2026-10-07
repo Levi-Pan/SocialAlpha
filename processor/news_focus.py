@@ -54,6 +54,10 @@ def classify_news_focus(record, config, now=None):
         reason = "future_publish_time"
     elif now - published > timedelta(hours=config["max_age_hours"]):
         reason = "outside_time_window"
+    elif record.get("content_kind") == "community" and any(
+        re.search(pattern, title, re.IGNORECASE) for pattern in config.get("community_exclude_patterns", [])
+    ):
+        reason = "low_information_community_post"
     elif entities:
         reason = "priority_entity"
     elif symbols and (events or not focus.get("require_major_event", False)):
@@ -63,4 +67,5 @@ def classify_news_focus(record, config, now=None):
     selected = reason in ("priority_entity", "tracked_symbol_major_event", "tracked_symbol_news")
     return {"selected": selected, "reason": reason, "entities": entities, "symbols": symbols,
             "event_terms": events, "priority": 1,
-            "attribution": "media_report"}
+            "attribution": {"community": "community_post", "official": "official_post"}.get(
+                record.get("content_kind"), "media_report")}

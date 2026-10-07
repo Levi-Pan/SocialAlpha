@@ -58,6 +58,8 @@ def _evidence(record, known_at, importance_weight=1.0):
         "title": record.get("title", ""),
         "url": record.get("url", ""),
         "source": record.get("source", ""),
+        "platform": record.get("platform", "news"),
+        "content_kind": record.get("content_kind", "media"),
         "summary": analysis.get("summary", ""),
         "known_at": known_at.isoformat(),
         "entities": focus.get("entities") or [],
@@ -110,6 +112,8 @@ def build_daily_report(analyses, config, now=None):
     eligible = []
     seen = set()
     for record in analyses:
+        if (record.get("content_kind") == "community") != config.get("_community_only", False):
+            continue
         if record.get("status") != "success" or not isinstance(record.get("analysis"), dict):
             continue
         published_at = _parse_time(record.get("publish_time"))
@@ -162,7 +166,7 @@ def build_daily_report(analyses, config, now=None):
     focus_entities = set(config.get("focus_entities", []))
     focus_updates = [_evidence(record, known_at, _importance_weight(record, default_weight, entity_weights))
                      for record, known_at in eligible if focus_entities.intersection((record.get("focus") or {}).get("entities") or [])]
-    return {
+    report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "as_of": as_of.isoformat(),
         "window_start": window_start.isoformat(),
@@ -180,6 +184,9 @@ def build_daily_report(analyses, config, now=None):
             "limitation": "文章总体情绪不代表其中每个币种的独立方向；该分数是新闻情绪指标，不是价格预测或交易建议。",
         },
     }
+    if not config.get("_community_only", False):
+        report["social_coins"] = build_daily_report(analyses, dict(config, _community_only=True), as_of)["coins"]
+    return report
 
 
 def _markdown_text(value):
@@ -204,6 +211,17 @@ def render_report_markdown(report):
         score = "—" if coin["sentiment_score"] is None else f"{coin['sentiment_score']:.3f}"
         coverage = "数据充足" if coin["coverage"] == "sufficient" else "数据不足"
         lines.append(f"| {_markdown_text(coin['symbol'])} | {coin['article_count']} | {coin['usable_count']} | {score} | {coverage} |")
+    if report.get("collection"):
+        lines.extend(["", "## 采集覆盖", "", "按日报发布时间窗口统计；采集和待分析数量不代表通过质量校验。", "",
+                      "| 币种 | 新闻与官方公告 | 社区帖子 | 待分析候选 |", "| --- | ---: | ---: | ---: |"])
+        for coin in report["collection"]:
+            lines.append(f"| {_markdown_text(coin['symbol'])} | {coin['news_count']} | {coin['community_count']} | {coin['pending_count']} |")
+    if report.get("source_statuses"):
+        lines.extend(["", "## 社媒来源状态", "", "来源读取成功不代表窗口内有新消息。", "",
+                      "| 来源 | 状态 | 读取条数 | 最新原帖发布时间 |", "| --- | --- | ---: | --- |"])
+        for source in report["source_statuses"]:
+            status = source["status"] + (f" HTTP {source['http_status']}" if source.get("http_status") else "")
+            lines.append(f"| {_markdown_text(source['source'])} | {_markdown_text(status)} | {source['count']} | {_markdown_text(source.get('latest_publish_time'))} |")
     weights_text = "、".join(f"{entity} {weight:g} 倍" for entity, weight in report["methodology"]["entity_weights"].items())
     lines.extend(["", report["methodology"]["limitation"], "",
                   f"计分权重：普通新闻 {report['methodology']['default_news_weight']:g} 倍；{weights_text or '无额外对象加权'}。按置信度与重要性加权平均，提及重点对象不代表其本人发出建议。",
@@ -214,7 +232,19 @@ def render_report_markdown(report):
             lines.extend(["窗口内无可用新闻依据。", ""])
         for evidence in coin["evidence"]:
             lines.extend([f"- {_markdown_text(evidence['title'])}（{_markdown_text(evidence['source'])}；{_markdown_text(evidence['attribution'])}）", f"  {_markdown_text(evidence['summary'])}", f"  原文：{evidence['url']}", f"  可知时间：{evidence['known_at']}", ""])
-    lines.extend(["## 重点对象动态", ""])
+    lines.extend(["## 社区情绪（独立统计）", "", "社区帖子不计入上方有效新闻数量或研究信号，观点不代表已核实事实。", "",
+                  "| 币种 | 相关帖子 | 有效分析 | 社区情绪分数 |", "| --- | ---: | ---: | ---: |"])
+    for coin in report.get("social_coins", []):
+        score = "—" if coin["sentiment_score"] is None else f"{coin['sentiment_score']:.3f}"
+        lines.append(f"| {_markdown_text(coin['symbol'])} | {coin['article_count']} | {coin['usable_count']} | {score} |")
+    lines.extend(["", "### 社区原帖依据", ""])
+    seen_social = set()
+    for coin in report.get("social_coins", []):
+        for evidence in coin["evidence"]:
+            if evidence["id"] not in seen_social:
+                seen_social.add(evidence["id"])
+                lines.append(f"- {_markdown_text(evidence['title'])}（{_markdown_text(evidence['source'])}）：{evidence['url']}")
+    lines.extend(["", "## 重点对象动态", ""])
     if not report["focus_updates"]:
         lines.extend(["窗口内无重点对象动态。", ""])
     for evidence in report["focus_updates"]:

@@ -1,31 +1,102 @@
 {
-  "input_parts": ["data", "news_clean.json"],
-  "output_parts": ["data", "news_analysis.json"],
-  "cache_parts": ["data", "analysis_cache.json"],
+  "input_parts": [
+    "data",
+    "news_clean.json"
+  ],
+  "output_parts": [
+    "data",
+    "news_analysis.json"
+  ],
+  "cache_parts": [
+    "data",
+    "analysis_cache.json"
+  ],
   "max_articles": 5,
+  "selection": {
+    "lookback_hours": 24,
+    "confidence_floor": 0.5
+  },
+  "community_exclude_patterns": [
+    "^day\\s+\\d+\\s+posting",
+    "^good\\s+(morning|evening|night)\\b",
+    "^(daily|weekly)\\s+(general\\s+)?discussion",
+    "^(to the moon|hodl)[! .🚀]*$"
+  ],
   "daily_max_requests": null,
-  "usage_parts": ["data", "analysis_usage.json"],
-  "lock_parts": ["data", "analysis.lock"],
+  "usage_parts": [
+    "data",
+    "analysis_usage.json"
+  ],
+  "lock_parts": [
+    "data",
+    "analysis.lock"
+  ],
   "max_age_hours": 48,
   "max_content_chars": 3000,
   "max_output_tokens": 800,
   "focus": {
     "require_major_event": false,
-    "symbol_aliases": {
-      "BTC": ["BTC", "Bitcoin"],
-      "ETH": ["ETH", "Ethereum", "Ether"],
-      "SOL": ["SOL", "Solana"],
-      "XRP": ["XRP", "Ripple"],
-      "DOGE": ["DOGE", "Dogecoin"],
-      "BNB": ["BNB", "Binance Coin", "BNB Chain"]
-    },
     "priority_entities": {
-      "Strategy": ["MicroStrategy", "Michael Saylor", "Saylor", "MSTR", "Strategy Inc"],
-      "CZ": ["CZ", "Changpeng Zhao", "Zhao Changpeng", "赵长鹏"]
+      "Strategy": [
+        "MicroStrategy",
+        "Michael Saylor",
+        "Saylor",
+        "MSTR",
+        "Strategy Inc"
+      ],
+      "CZ": [
+        "CZ",
+        "Changpeng Zhao",
+        "Zhao Changpeng",
+        "赵长鹏"
+      ]
     },
-    "strategy_context": ["Bitcoin", "BTC", "treasury", "Saylor", "MSTR"],
-    "strategy_company_terms": ["buys", "bought", "purchases", "purchased", "acquires", "adds", "holds", "reports", "raises", "announces", "stock", "shares"],
-    "major_event_terms": ["ETF", "SEC", "regulation", "regulatory", "lawsuit", "court", "approval", "approved", "ban", "hack", "hacked", "exploit", "breach", "outage", "upgrade", "hard fork", "mainnet", "Federal Reserve", "interest rate", "监管", "黑客", "漏洞", "升级"]
+    "strategy_context": [
+      "Bitcoin",
+      "BTC",
+      "treasury",
+      "Saylor",
+      "MSTR"
+    ],
+    "strategy_company_terms": [
+      "buys",
+      "bought",
+      "purchases",
+      "purchased",
+      "acquires",
+      "adds",
+      "holds",
+      "reports",
+      "raises",
+      "announces",
+      "stock",
+      "shares"
+    ],
+    "major_event_terms": [
+      "ETF",
+      "SEC",
+      "regulation",
+      "regulatory",
+      "lawsuit",
+      "court",
+      "approval",
+      "approved",
+      "ban",
+      "hack",
+      "hacked",
+      "exploit",
+      "breach",
+      "outage",
+      "upgrade",
+      "hard fork",
+      "mainnet",
+      "Federal Reserve",
+      "interest rate",
+      "监管",
+      "黑客",
+      "漏洞",
+      "升级"
+    ]
   },
   "timeout": 45,
   "prompt_version": "news-focus-v2",
